@@ -1,4 +1,4 @@
-# ASm to LST Viewer
+# Z80
 
 Este proyecto es un ensamblador para el procesador Z80, escrito en JavaScript. Convierte código ensamblador Z80 (ASM) en código máquina, generando archivos `.lst`.
 
