@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ASM to LST Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            height: 100vh;
+            margin: 0;
+        }
+        .half {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            border-right: 1px solid #ccc;
+        }
+        .half:last-child {
+            border-right: none;
+        }
+        .menu {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: white;
+            border: 1px solid #ccc;
+            padding: 10px;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+
+<div class="menu">
+    <label for="fileSelector">Select a file:</label>
+    <input type="file" id="fileSelector" accept=".asm,.lst">
+</div>
+
+<div class="half">
+    <h2>ASM Code</h2>
+    <pre id="asmContent"></pre>
+</div>
+<div class="half">
+    <h2>LST Code</h2>
+    <pre id="lstContent"></pre>
+</div>
+
+<script src="asembly.js"></script>
+</body>
+</html>
