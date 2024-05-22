@@ -14,8 +14,3 @@ Este proyecto es un ensamblador para el procesador Z80, escrito en JavaScript. C
 2. Haz clic en "Select a file" y selecciona un archivo `.asm`.
 3. El ensamblador procesará el archivo y mostrará el contenido ASM y el resultado LST en pantalla.
 4. El archivo `.lst` generado se descargará automáticamente.
-
-## Contribuciones
-
-Las contribuciones son bienvenidas. Por favor, lee [CONTRIBUTING.md](CONTRIBUTING.md) para más detalles.
-
