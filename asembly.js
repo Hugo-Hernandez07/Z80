@@ -24,7 +24,7 @@ function assemble(asmCode) {
         line = line.trim().split(';')[0].trim();
         if (!line) return;
         const parts = line.split(/\s+/);
-        if (parts[0].endsWith(':')) {
+        if (parts[0].endswith(':')) {
             const label = parts[0].slice(0, -1);
             labels[label] = address;
             if (parts.length > 1) {
@@ -54,10 +54,10 @@ function assemble(asmCode) {
                     if (dest === "A" && src.startsWith("(") && src.endsWith("H)")) {
                         const addr = parseInt(src.slice(1, -2), 16);
                         machineCode = [0x3A, addr & 0xFF, (addr >> 8) & 0xFF];
-                    } else if (dest.startsWith("(") && dest.endsWith("H)") && src === "A") {
+                    } else if (dest.startswith("(") && dest.endswith("H)") && src === "A") {
                         const addr = parseInt(dest.slice(1, -2), 16);
                         machineCode = [0x32, addr & 0xFF, (addr >> 8) & 0xFF];
-                    } else if (["A", "B", "C", "D", "E", "H", "L"].includes(dest) && src.startsWith("0x")) {
+                    } else if (["A", "B", "C", "D", "E", "H", "L"].includes(dest) && src.startswith("0x")) {
                         const reg = dest;
                         const value = parseInt(src, 16);
                         if (reg === "A") machineCode = [0x3E, value];
@@ -66,6 +66,10 @@ function assemble(asmCode) {
                     } else if (["A", "B", "C", "D", "E", "H", "L"].includes(dest) && ["A", "B", "C", "D", "E", "H", "L"].includes(src)) {
                         const regMap = { "A": 0x7F, "B": 0x40, "C": 0x41, "D": 0x42, "E": 0x43, "H": 0x44, "L": 0x45 };
                         machineCode = [regMap[dest] + regMap[src] - 0x40];
+                    } else if (["A", "B", "C", "D", "E", "H", "L"].includes(dest) && src.startswith("(") && src.endswith("H)")) {
+                        const addr = parseInt(src.slice(1, -2), 16);
+                        const regMap = { "A": 0x7E, "B": 0x46, "C": 0x4E, "D": 0x56, "E": 0x5E, "H": 0x66, "L": 0x6E };
+                        machineCode = [regMap[dest], addr & 0xFF, (addr >> 8) & 0xFF];
                     }
                 }
             } else if (mnemonic === "JP") {
@@ -80,7 +84,7 @@ function assemble(asmCode) {
                 }
             } else if (mnemonic === "CP") {
                 if (operands.length === 1) {
-                    const value = operands[0].startsWith('0x') ? parseInt(operands[0], 16) : parseInt(operands[0]);
+                    const value = operands[0].startswith('0x') ? parseInt(operands[0], 16) : parseInt(operands[0]);
                     machineCode = [0xFE, value];
                 }
             } else if (mnemonic === "ADD") {
