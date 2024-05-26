@@ -9,7 +9,9 @@ const opcodes = {
     "CP": 0xFE,
     "PUSH": 0xC5, // PUSH BC es un ejemplo, el opcode dependerá de los registros usados
     "POP": 0xC1,  // POP BC es un ejemplo, el opcode dependerá de los registros usados
-    "DJNZ": 0x10  // DJNZ opcode
+    "DJNZ": 0x10, // DJNZ opcode
+    "INC": 0x04,  // INC r opcode (INC B es 0x04, INC C es 0x0C, etc.)
+    "DEC": 0x05   // DEC r opcode (DEC B es 0x05, DEC C es 0x0D, etc.)
 };
 
 // Función para ensamblar el código ASM
@@ -64,19 +66,25 @@ function assemble(asmCode) {
                     const src = operands[1];
                     if (dest === "A" && src.startsWith("(") && src.endsWith("H)")) {
                         const addr = parseInt(src.slice(1, -2), 16);
-                        machineCode = [0x3A, addr & 0xFF, (addr >> 8) & 0xFF];
-                        instructionLength = 3;
+                        if (!isNaN(addr)) {
+                            machineCode = [0x3A, addr & 0xFF, (addr >> 8) & 0xFF];
+                            instructionLength = 3;
+                        }
                     } else if (dest.startsWith("(") && dest.endsWith("H)") && src === "A") {
                         const addr = parseInt(dest.slice(1, -2), 16);
-                        machineCode = [0x32, addr & 0xFF, (addr >> 8) & 0xFF];
-                        instructionLength = 3;
+                        if (!isNaN(addr)) {
+                            machineCode = [0x32, addr & 0xFF, (addr >> 8) & 0xFF];
+                            instructionLength = 3;
+                        }
                     } else if (["A", "B", "C", "D", "E", "H", "L"].includes(dest) && src.startsWith("0x")) {
                         const reg = dest;
                         const value = parseInt(src, 16);
-                        if (reg === "A") machineCode = [0x3E, value];
-                        else if (reg === "B") machineCode = [0x06, value];
-                        else if (reg === "C") machineCode = [0x0E, value];
-                        instructionLength = 2;
+                        if (!isNaN(value)) {
+                            if (reg === "A") machineCode = [0x3E, value];
+                            else if (reg === "B") machineCode = [0x06, value];
+                            else if (reg === "C") machineCode = [0x0E, value];
+                            instructionLength = 2;
+                        }
                     } else if (["A", "B", "C", "D", "E", "H", "L"].includes(dest) && ["A", "B", "C", "D", "E", "H", "L"].includes(src)) {
                         const regMap = { "A": 0x78, "B": 0x40, "C": 0x48, "D": 0x50, "E": 0x58, "H": 0x60, "L": 0x68 };
                         machineCode = [regMap[dest] + (regMap[src] & 0x07)];
@@ -86,27 +94,35 @@ function assemble(asmCode) {
             } else if (mnemonic === "JP") {
                 if (operands.length === 1) {
                     const addr = labels[operands[0]] !== undefined ? labels[operands[0]] : parseInt(operands[0], 16);
-                    machineCode = [0xC3, addr & 0xFF, (addr >> 8) & 0xFF];
-                    instructionLength = 3;
+                    if (!isNaN(addr)) {
+                        machineCode = [0xC3, addr & 0xFF, (addr >> 8) & 0xFF];
+                        instructionLength = 3;
+                    }
                 }
             } else if (mnemonic === "JR") {
                 if (operands.length === 1) {
                     const offset = labels[operands[0]] !== undefined ? labels[operands[0]] - (address + 2) : parseInt(operands[0], 16);
-                    machineCode = [0x18, offset & 0xFF];
-                    instructionLength = 2;
+                    if (!isNaN(offset)) {
+                        machineCode = [0x18, offset & 0xFF];
+                        instructionLength = 2;
+                    }
                 }
             } else if (mnemonic === "CP") {
                 if (operands.length === 1) {
                     const value = operands[0].startsWith('0x') ? parseInt(operands[0], 16) : parseInt(operands[0]);
-                    machineCode = [0xFE, value];
-                    instructionLength = 2;
+                    if (!isNaN(value)) {
+                        machineCode = [0xFE, value];
+                        instructionLength = 2;
+                    }
                 }
             } else if (mnemonic === "ADD") {
                 if (operands.length === 2 && operands[0] === "A") {
                     const reg = operands[1];
                     const regMap = { "B": 0x80, "C": 0x81, "D": 0x82, "E": 0x83, "H": 0x84, "L": 0x85 };
-                    machineCode = [regMap[reg]];
-                    instructionLength = 1;
+                    if (regMap[reg] !== undefined) {
+                        machineCode = [regMap[reg]];
+                        instructionLength = 1;
+                    }
                 }
             } else if (mnemonic === "PUSH" || mnemonic === "POP") {
                 if (operands.length === 1) {
@@ -117,15 +133,34 @@ function assemble(asmCode) {
                         "HL": 0x20,
                         "AF": 0x30
                     };
-                    machineCode = [opcode + regMap[reg]];
-                    instructionLength = 1;
+                    if (regMap[reg] !== undefined) {
+                        machineCode = [opcode + regMap[reg]];
+                        instructionLength = 1;
+                    }
                 }
             } else if (mnemonic === "DJNZ") {
                 if (operands.length === 1) {
                     const offset = labels[operands[0]] !== undefined ? labels[operands[0]] - (address + 2) : parseInt(operands[0], 16);
-                    machineCode = [0x10, offset & 0xFF];
-                    instructionLength = 2;
+                    if (!isNaN(offset)) {
+                        machineCode = [0x10, offset & 0xFF];
+                        instructionLength = 2;
+                    }
                 }
+            } else if (mnemonic === "INC" || mnemonic === "DEC") {
+                if (operands.length === 1) {
+                    const reg = operands[0];
+                    const regMap = {
+                        "B": 0x00, "C": 0x01, "D": 0x02, "E": 0x03, "H": 0x04, "L": 0x05, "(HL)": 0x06, "A": 0x07
+                    };
+                    if (regMap[reg] !== undefined) {
+                        machineCode = [opcode + regMap[reg]];
+                        instructionLength = 1;
+                    }
+                }
+            }
+
+            if (machineCode.includes(NaN)) {
+                throw new Error(`Invalid operand in instruction on line ${instruction.index + 1}: ${line}`);
             }
 
             hexOutput.push(...machineCode);
