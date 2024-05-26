@@ -9,6 +9,7 @@ const opcodes = {
     "CP": 0xFE,
     "PUSH": 0xC5, // PUSH BC es un ejemplo, el opcode dependerá de los registros usados
     "POP": 0xC1,  // POP BC es un ejemplo, el opcode dependerá de los registros usados
+    "DJNZ": 0x10  // DJNZ opcode
 };
 
 // Función para ensamblar el código ASM
@@ -24,19 +25,28 @@ function assemble(asmCode) {
         line = line.trim().split(';')[0].trim();
         if (!line) return;
         const parts = line.split(/\s+/);
-        if (parts[0].endsWith(':')) {
+        if (parts[0].toUpperCase() === "ORG") {
+            address = parseInt(parts[1], 16);
+        } else if (parts[0].endsWith(':')) {
             const label = parts[0].slice(0, -1);
             labels[label] = address;
             if (parts.length > 1) {
                 instructions.push({ line: parts.slice(1).join(' '), address, index });
+                address += 3; // Incrementar por 3 bytes para cada instrucción como aproximación
             }
         } else {
             instructions.push({ line, address, index });
+            address += 3; // Incrementar por 3 bytes para cada instrucción como aproximación
         }
-        address += 3;
     });
 
-    address = 0;
+    // Reset address to the starting address specified by ORG
+    if (lines[0].split(/\s+/)[0].toUpperCase() === "ORG") {
+        address = parseInt(lines[0].split(/\s+/)[1], 16);
+    } else {
+        address = 0;
+    }
+
     instructions.forEach(instruction => {
         const line = instruction.line;
         const parts = line.split(/\s+/);
@@ -46,6 +56,7 @@ function assemble(asmCode) {
         const opcode = opcodes[mnemonic];
         if (opcode !== undefined) {
             let machineCode = [opcode];
+            let instructionLength = 1;
 
             if (mnemonic === "LD") {
                 if (operands.length === 2) {
@@ -54,40 +65,48 @@ function assemble(asmCode) {
                     if (dest === "A" && src.startsWith("(") && src.endsWith("H)")) {
                         const addr = parseInt(src.slice(1, -2), 16);
                         machineCode = [0x3A, addr & 0xFF, (addr >> 8) & 0xFF];
+                        instructionLength = 3;
                     } else if (dest.startsWith("(") && dest.endsWith("H)") && src === "A") {
                         const addr = parseInt(dest.slice(1, -2), 16);
                         machineCode = [0x32, addr & 0xFF, (addr >> 8) & 0xFF];
+                        instructionLength = 3;
                     } else if (["A", "B", "C", "D", "E", "H", "L"].includes(dest) && src.startsWith("0x")) {
                         const reg = dest;
                         const value = parseInt(src, 16);
                         if (reg === "A") machineCode = [0x3E, value];
                         else if (reg === "B") machineCode = [0x06, value];
                         else if (reg === "C") machineCode = [0x0E, value];
+                        instructionLength = 2;
                     } else if (["A", "B", "C", "D", "E", "H", "L"].includes(dest) && ["A", "B", "C", "D", "E", "H", "L"].includes(src)) {
-                        const regMap = { "A": 0x7F, "B": 0x40, "C": 0x41, "D": 0x42, "E": 0x43, "H": 0x44, "L": 0x45 };
-                        machineCode = [regMap[dest] + regMap[src] - 0x40];
+                        const regMap = { "A": 0x78, "B": 0x40, "C": 0x48, "D": 0x50, "E": 0x58, "H": 0x60, "L": 0x68 };
+                        machineCode = [regMap[dest] + (regMap[src] & 0x07)];
+                        instructionLength = 1;
                     }
                 }
             } else if (mnemonic === "JP") {
                 if (operands.length === 1) {
                     const addr = labels[operands[0]] !== undefined ? labels[operands[0]] : parseInt(operands[0], 16);
                     machineCode = [0xC3, addr & 0xFF, (addr >> 8) & 0xFF];
+                    instructionLength = 3;
                 }
             } else if (mnemonic === "JR") {
                 if (operands.length === 1) {
                     const offset = labels[operands[0]] !== undefined ? labels[operands[0]] - (address + 2) : parseInt(operands[0], 16);
                     machineCode = [0x18, offset & 0xFF];
+                    instructionLength = 2;
                 }
             } else if (mnemonic === "CP") {
                 if (operands.length === 1) {
                     const value = operands[0].startsWith('0x') ? parseInt(operands[0], 16) : parseInt(operands[0]);
                     machineCode = [0xFE, value];
+                    instructionLength = 2;
                 }
             } else if (mnemonic === "ADD") {
                 if (operands.length === 2 && operands[0] === "A") {
                     const reg = operands[1];
                     const regMap = { "B": 0x80, "C": 0x81, "D": 0x82, "E": 0x83, "H": 0x84, "L": 0x85 };
                     machineCode = [regMap[reg]];
+                    instructionLength = 1;
                 }
             } else if (mnemonic === "PUSH" || mnemonic === "POP") {
                 if (operands.length === 1) {
@@ -99,16 +118,31 @@ function assemble(asmCode) {
                         "AF": 0x30
                     };
                     machineCode = [opcode + regMap[reg]];
+                    instructionLength = 1;
+                }
+            } else if (mnemonic === "DJNZ") {
+                if (operands.length === 1) {
+                    const offset = labels[operands[0]] !== undefined ? labels[operands[0]] - (address + 2) : parseInt(operands[0], 16);
+                    machineCode = [0x10, offset & 0xFF];
+                    instructionLength = 2;
                 }
             }
 
             hexOutput.push(...machineCode);
             lstOutput.push(`${address.toString(16).padStart(4, '0').toUpperCase()} ${machineCode.map(byte => byte.toString(16).padStart(2, '0').toUpperCase()).join(' ')} ${line}`);
-            address += machineCode.length;
+            address += instructionLength;
         }
     });
 
-    return lstOutput.join('\n');
+    const hexContent = hexOutput.map(byte => byte.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+
+    // Construcción de la tabla de símbolos
+    let symbolTable = "\n\nTabla de Símbolos:\n";
+    for (const [label, addr] of Object.entries(labels)) {
+        symbolTable += `${label}: ${addr.toString(16).padStart(4, '0').toUpperCase()}\n`;
+    }
+
+    return { lstContent: lstOutput.join('\n') + symbolTable, hexContent };
 }
 
 // Función para descargar contenido como archivo
@@ -132,11 +166,13 @@ document.getElementById('fileSelector').addEventListener('change', function(even
             const extension = file.name.split('.').pop().toLowerCase();
             if (extension === 'asm') {
                 document.getElementById('asmContent').textContent = content;
-                const lstContent = assemble(content);
+                const { lstContent, hexContent } = assemble(content);
                 document.getElementById('lstContent').textContent = lstContent;
 
-                const outputFileName = file.name.replace(/\.asm$/i, '.lst');
-                download(lstContent, outputFileName);
+                const lstFileName = file.name.replace(/\.asm$/i, '.lst');
+                const hexFileName = file.name.replace(/\.asm$/i, '.hex');
+                download(lstContent, lstFileName);
+                download(hexContent, hexFileName);
             } else if (extension === 'lst') {
                 document.getElementById('lstContent').textContent = content;
             }
